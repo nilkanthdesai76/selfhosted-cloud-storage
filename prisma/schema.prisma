@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  secretKey     String   @unique
+  planId        String   @default("free")
+  storageUsed   BigInt   @default(0)
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  files         File[]
+  shares        Share[]
+  plan          Plan     @relation(fields: [planId], references: [id])
+  otps          OTP[]
+  passwordResets PasswordReset[]
+  trustedDevices TrustedDevice[]
+  folders       Folder[]
+  
+  @@index([email])
+  @@index([secretKey])
+}
+
+model OTP {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String
+  code      String
+  type      String   // 'signup', 'login', 'verify'
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([email])
+  @@index([code])
+  @@index([expiresAt])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+}
+
+model TrustedDevice {
+  id           String   @id @default(cuid())
+  userId       String
+  deviceId     String
+  deviceName   String
+  lastUsedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, deviceId])
+  @@index([deviceId])
+}
+
+model Folder {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  parentId  String?
+  starred   Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  children  Folder[] @relation("FolderHierarchy")
+  
+  @@index([userId])
+  @@index([parentId])
+  @@index([deletedAt])
+  @@index([starred])
+}
+
+model Plan {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  storageLimit  BigInt
+  price         Float
+  features      Json
+  createdAt     DateTime @default(now())
+  
+  users         User[]
+}
+
+model File {
+  id            String    @id @default(cuid())
+  userId        String
+  filename      String
+  originalName  String
+  fileHash      String
+  size          BigInt
+  mimeType      String
+  shardId       Int
+  shardType     String    // 'hot' or 'cold'
+  encrypted     Boolean   @default(false)
+  parentId      String?
+  isFolder      Boolean   @default(false)
+  starred       Boolean   @default(false)
+  deletedAt     DateTime?
+  lastAccessedAt DateTime @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent        File?     @relation("FileHierarchy", fields: [parentId], references: [id])
+  children      File[]    @relation("FileHierarchy")
+  shares        Share[]
+  
+  @@index([userId])
+  @@index([fileHash])
+  @@index([parentId])
+  @@index([deletedAt])
+  @@index([lastAccessedAt])
+  @@index([starred])
+}
+
+model Share {
+  id            String    @id @default(cuid())
+  fileId        String
+  userId        String
+  shareToken    String    @unique
+  passwordHash  String?
+  expiresAt     DateTime?
+  maxDownloads  Int?
+  downloadCount Int       @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  
+  file          File      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([shareToken])
+  @@index([fileId])
+  @@index([expiresAt])
+}
