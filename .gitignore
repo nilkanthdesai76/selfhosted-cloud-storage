@@ -1,0 +1,9 @@
+node_modules/
+frontend/node_modules/
+.env
+storage/
+temp-uploads/
+dist/
+frontend/dist/
+*.log
+.DS_Store
